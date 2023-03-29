@@ -124,6 +124,7 @@ n = 5 #no. of UAVs
 u, v, pos, goal, priority, a, completed, clip, vmax = generator(n)
 
 priority = np.array([1,2,3,2,1])
+completion = [0]*n
 
 """
 Now we calculate the forces to be applied
@@ -137,7 +138,7 @@ check = np.ones(n)
 
 def reached_goal(i):
     global pos, goal
-    if np.linalg.norm(pos[i]-goal[i]) <= 0.5:
+    if np.linalg.norm(pos[i]-goal[i]) <= 1:
         return True
     else:
         return False
@@ -168,19 +169,72 @@ def clip_v(n):
 
         if np.linalg.norm(v[i])>vmax[i]:
             v[i] = vmax[i]*v[i]/np.linalg.norm(v[i])
-        print(i,v[i])
+        print(i,v[i], np.linalg.norm(v[i]), vmax[i])
 
-            
 
-file = open('out.csv','w')
-velocity_file = open('vel.csv', 'w')
-acc_file = open('acc.csv', 'w')
-header = ""
-for m in range(n):
-    header += str(m)+"x,"+str(m)+"y,"
-file.write(header+"\n")
-velocity_file.write(header+"\n")
-acc_file.write(header+"\n")
+"""
+Function to pertube angle of vector by a slight amount randomly. draw from N(0, pi/64)
+let's pertube the whole v matrix
+"""
+
+
+def pertube(v):
+    
+    for i, vel in enumerate(v):
+        x = vel[0]
+        y = vel[1]
+
+        delta_theta = np.random.normal(0,np.pi/2**10.5)
+        theta = np.arctan2(y, x)
+
+        # Perturb the angle by a small amount
+        theta_perturbed = theta + delta_theta
+
+        # Calculate the perturbed vector components using the perturbed angle
+        x_perturbed = np.cos(theta_perturbed) * np.sqrt(x**2 + y**2)
+        y_perturbed = np.sin(theta_perturbed) * np.sqrt(x**2 + y**2)
+
+        v[i] = np.array([x_perturbed, y_perturbed])
+
+"""
+test:
+v - pertube(v) != 0
+"""
+
+"""
+rotate vector v=x,y by angle theta
+"""
+
+def rotate_vector(v, theta):
+    x, y = v[0], v[1]
+    # convert theta to radians
+    #theta = math.radians(theta)
+    
+    # calculate sine and cosine of theta
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+    
+    # apply rotation formula
+    x_new = x * cos_theta - y * sin_theta
+    y_new = x * sin_theta + y * cos_theta
+    
+    return np.array([x_new, y_new])
+
+r=0
+if __name__ == "__main__":
+
+    file = open('out.csv','w')
+    velocity_file = open('vel.csv', 'w')
+    time_file = open('time.csv', 'w')
+    acc_file = open('acc.csv', 'w')
+    header = ""
+    for m in range(n):
+        header += str(m)+"x,"+str(m)+"y,"
+    file.write(header+"\n")
+    velocity_file.write(header+"\n")
+    acc_file.write(header+"\n")
+    header2 = ", ".join([f"{i+1}" for i in range(n)])+"\n"
+    time_file.write(header2)
 
 while (completed != check).all():
     """

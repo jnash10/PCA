@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy import e 
-
+import math
 
 #global position matrix
 #global current velocity matrix
@@ -48,7 +48,7 @@ pos = pos + u*delt
 
 delt = 0.001
 radius = 10
-maxv = 10
+maxv = 2
 
 
 
@@ -124,6 +124,7 @@ n = 5 #no. of UAVs
 u, v, pos, goal, priority, a, completed, clip, vmax = generator(n)
 
 priority = np.array([1,2,3,2,1])
+completion = [0]*n
 
 """
 Now we calculate the forces to be applied
@@ -150,7 +151,7 @@ def collision(i,j):#return true if collision eminenent between j and i. collisio
     else:
         s_quared = np.dot(pos[i] + v[i]*t - pos[j] - v[j]*t, pos[i] + v[i]*t - pos[j] - v[j]*t) 
 
-        if np.sqrt(s_quared)<0.1:
+        if np.sqrt(s_quared)<0.5:
             return True
         else:
             return False
@@ -168,103 +169,164 @@ def clip_v(n):
 
         if np.linalg.norm(v[i])>vmax[i]:
             v[i] = vmax[i]*v[i]/np.linalg.norm(v[i])
-        print(i,v[i])
+        print(i,v[i], np.linalg.norm(v[i]), vmax[i])
+
+
+"""
+Function to pertube angle of vector by a slight amount randomly. draw from N(0, pi/64)
+let's pertube the whole v matrix
+"""
+
+
+def pertube(v):
+    
+    for i, vel in enumerate(v):
+        x = vel[0]
+        y = vel[1]
+
+        delta_theta = np.random.normal(0,np.pi/2**10.5)
+        theta = np.arctan2(y, x)
+
+        # Perturb the angle by a small amount
+        theta_perturbed = theta + delta_theta
+
+        # Calculate the perturbed vector components using the perturbed angle
+        x_perturbed = np.cos(theta_perturbed) * np.sqrt(x**2 + y**2)
+        y_perturbed = np.sin(theta_perturbed) * np.sqrt(x**2 + y**2)
+
+        v[i] = np.array([x_perturbed, y_perturbed])
+
+"""
+test:
+v - pertube(v) != 0
+"""
+
+"""
+rotate vector v=x,y by angle theta
+"""
+
+def rotate_vector(v, theta):
+    x, y = v[0], v[1]
+    # convert theta to radians
+    #theta = math.radians(theta)
+    
+    # calculate sine and cosine of theta
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+    
+    # apply rotation formula
+    x_new = x * cos_theta - y * sin_theta
+    y_new = x * sin_theta + y * cos_theta
+    
+    return np.array([x_new, y_new])
+
+r=0
+if __name__ == "__main__":
+
+    file = open('out.csv','w')
+    velocity_file = open('vel.csv', 'w')
+    time_file = open('time.csv', 'w')
+    acc_file = open('acc.csv', 'w')
+    header = ""
+    for m in range(n):
+        header += str(m)+"x,"+str(m)+"y,"
+    file.write(header+"\n")
+    velocity_file.write(header+"\n")
+    acc_file.write(header+"\n")
+    header2 = ", ".join([f"{i+1}" for i in range(n)])+"\n"
+    time_file.write(header2)
+
+    while not np.array_equal(completed, check):
+        r+=1
+        """
+        for each UAV:
+            if reached goal:
+                completed[self] = 1
+
+            attractive    
+            calculate goal a
+            add to a
+
+            repulsive
+            for each other UAV:
+                if collision:
+                    clip[self] = True
+                    calculate repulsive a
+                    add to a
+                else:
+                    pass
+
+        
+        v = v + a*delt
+        clip v
+        to clip v, 
+        for each uav:
+            if clip[i] == True
+                vmax[i] = maxv*my_p/(max_p - lowest_p + 1)
+            else:
+                vmax[i] = maxv
+            if v>vmax:
+                v = maxvv[i]-v[j]
+        
+
+        completition check: within 0.1 of goal
+        """
+        clip = np.zeros(n)
+        a = np.zeros((n,2))
+        for i in range(n):
+            if reached_goal(i):
+                if completed[i] != 1:
+                    completed[i] = 1
+                    a[i] = 0
+                    v[i] = 0
+                    completion[i]=r
+                
+            else:
+                #attractive potential 
+                dist_to_goal = np.linalg.norm(goal-pos)
+                attr = 2*(1-e**(-2*dist_to_goal**2))*np.array(goal[i]-pos[i])/dist_to_goal
+                a[i] = np.array(attr)
+                #print("a",i,a[i])
+
+                #repulsive potential
+                colliding=False
+                for j in range(n):
+                    if j != i:
+                        if collision(i, j):
+                            colliding=True
+                            print("collision",i,j)
+                            dist = np.linalg.norm(pos[j]-pos[i])
+                            rep = (priority[j]/priority[i])*4*(e**(-0.2*dist**2))*(pos[i]-pos[j])/dist
+                            rep = rotate_vector(rep, np.pi/2)
+                            #print(i,j,dist,rep,a[i])
+                            a[i] += rep
+                            
+                
+                if colliding:
+                    clip[i]=1
+
+        pertube(v)
+        v = v + a*delt
+        clip_v(n)
+        pos = pos + v*delt
+
+        file.write(",".join([str(x) for x in pos.flatten()])+"\n")
+        velocity_file.write(", ".join([str(x) for x in v.flatten()])+"\n")
+        acc_file.write(", ".join([str(x) for x in a.flatten()])+"\n")
+    print(completed)
+    print(check)
+    time_file.write(", ".join([str(x) for x in completion]))
+    time_file.close()
+
+    file.close()
+    velocity_file.close() 
+
+
+    acc_file.close()
+
+
 
             
-
-file = open('out.csv','w')
-velocity_file = open('vel.csv', 'w')
-acc_file = open('acc.csv', 'w')
-header = ""
-for m in range(n):
-    header += str(m)+"x,"+str(m)+"y,"
-file.write(header+"\n")
-velocity_file.write(header+"\n")
-acc_file.write(header+"\n")
-
-while (completed != check).all():
-    """
-    for each UAV:
-        if reached goal:
-            completed[self] = 1
-
-        attractive    
-        calculate goal a
-        add to a
-
-        repulsive
-        for each other UAV:
-            if collision:
-                clip[self] = True
-                calculate repulsive a
-                add to a
-            else:
-                pass
-
-    
-    v = v + a*delt
-    clip v
-    to clip v, 
-    for each uav:
-        if clip[i] == True
-            vmax[i] = maxv*my_p/(max_p - lowest_p + 1)
-        else:
-            vmax[i] = maxv
-        if v>vmax:
-            v = maxvv[i]-v[j]
-    
-
-    completition check: within 0.1 of goal
-    """
-    clip = np.zeros(n)
-    a = np.zeros((n,2))
-    for i in range(n):
-        if reached_goal(i):
-            completed[i] = 1
-            a[i] = 0
-            v[i] = 0
-            continue
-
-        #attractive potential 
-        dist_to_goal = np.linalg.norm(goal-pos)
-        attr = 4*(1-e**(-2*dist_to_goal**2))*np.array(goal[i]-pos[i])/dist_to_goal
-        a[i] = np.array(attr)
-        #print("a",i,a[i])
-
-        #repulsive potential
-        colliding=False
-        for j in range(n):
-            if j != i:
-                if collision(i, j):
-                    colliding=True
-                    print("collision",i,j)
-                    dist = np.linalg.norm(pos[j]-pos[i])
-                    rep = (priority[j]/priority[i])*10*(e**(-0.2*dist**2))*(pos[i]-pos[j])/dist
-                    #print(i,j,dist,rep,a[i])
-                    a[i] += rep
-                    
-        
-        if colliding:
-            clip[i]=1
-
-
-    v = v + a*delt
-    clip_v(n)
-    pos = pos + v*delt
-
-    file.write(",".join([str(x) for x in pos.flatten()])+"\n")
-    velocity_file.write(", ".join([str(x) for x in v.flatten()])+"\n")
-    acc_file.write(", ".join([str(x) for x in a.flatten()])+"\n")
-
-file.close()
-velocity_file.close() 
-
-
-acc_file.close()
-
-
-
-        
         
     
 

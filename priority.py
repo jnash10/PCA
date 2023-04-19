@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy import e 
 import math
-
+from hyperparameters import noise, n, radius, delt
 #global position matrix
 #global current velocity matrix
 
@@ -46,8 +46,8 @@ clip u
 pos = pos + u*delt
 """
 
-delt = 0.001
-radius = 10
+#delt = 0.01
+#radius = 100
 maxv = 2
 
 
@@ -74,15 +74,15 @@ def initialise_pos(n):
     start = []
     goal = []
 
-    np.random.seed(5)
+    np.random.seed(3)
     for i in range(n):
         x = np.cos(2*i*np.pi/n)
         y = np.sin(2*i*np.pi/n)
 
         start.append((x, y))
 
-        noise = 0
-        #noise = np.random.normal(0, np.pi/6)
+        #noise = 0
+        #noise = np.random.normal(0, np.pi/12)
         x_ = -np.cos(2*i*np.pi/n + noise)
         y_ = -np.sin(2*i*np.pi/n + noise)
 
@@ -119,13 +119,15 @@ def generator(n):
 
     return u, v, pos, goal, priority, a, completed, clip, vmax
 
-n = 5 #no. of UAVs
+#n = 22 #no. of UAVs
 
 u, v, pos, goal, priority, a, completed, clip, vmax = generator(n)
 
-priority = np.array([1,2,3,2,1])
+priority = np.random.normal(3,1, n)
 completion = [0]*n
-
+priority_file = open("priority.csv",'w')
+priority_file.write(", ".join([str(x) for x in priority]))
+priority_file.close()
 """
 Now we calculate the forces to be applied
 
@@ -134,14 +136,23 @@ attractive: a(1-e**(-bd^2))[unit dir vector]  a:max acceleration, b:reducing spr
 repulsive: ae**(-bd**2)[unit dir vector]  a:max repulsive force, b:repulsive spread, d:distance to obstacle
 """
 check = np.ones(n)
+min_dist = np.inf*np.ones((n,n))
+avg_dist = np.zeros(n)
 
+"""
+two definitions for reached goal(completed trip), one checks wether distance to goal is less than 0.5
 
+"""
 def reached_goal(i):
-    global pos, goal
-    if np.linalg.norm(pos[i]-goal[i]) <= 0.5:
+    global pos, goal, r
+    if np.linalg.norm(pos[i]-goal[i]) <= 5:
+        print(f"UAV {i} reached goal. Priority:{priority[i]}")
         return True
     else:
         return False
+    # if np.linalg.norm(pos[i]) > r:
+    #     return True
+    
 
 def collision(i,j):#return true if collision eminenent between j and i. collision threshold = 0.1
     t = -np.dot(pos[i]-pos[j],v[i]-v[j])/(np.dot(v[i]-v[j], v[i]-v[j])+0.00001)
@@ -166,10 +177,12 @@ def clip_v(n):
             vmax[i] = maxv*priority[i]/max(priority)
         else:
             vmax[i] = maxv
-
+        #vmax[i]=maxv
         if np.linalg.norm(v[i])>vmax[i]:
             v[i] = vmax[i]*v[i]/np.linalg.norm(v[i])
-        print(i,v[i], np.linalg.norm(v[i]), vmax[i])
+
+        
+        #print(i,v[i], np.linalg.norm(v[i]), vmax[i])
 
 
 """
@@ -234,7 +247,7 @@ if __name__ == "__main__":
     velocity_file.write(header+"\n")
     acc_file.write(header+"\n")
     header2 = ", ".join([f"{i+1}" for i in range(n)])+"\n"
-    time_file.write(header2)
+    #time_file.write(", ".join([str(x) for x in priority]))
 
     while not np.array_equal(completed, check):
         r+=1
@@ -249,6 +262,7 @@ if __name__ == "__main__":
 
             repulsive
             for each other UAV:
+                calc dist -> update min dist
                 if collision:
                     clip[self] = True
                     calculate repulsive a
@@ -284,19 +298,23 @@ if __name__ == "__main__":
             else:
                 #attractive potential 
                 dist_to_goal = np.linalg.norm(goal-pos)
-                attr = 2*(1-e**(-2*dist_to_goal**2))*np.array(goal[i]-pos[i])/dist_to_goal
+                #attr = 2*(1-e**(-2*dist_to_goal**2))*np.array(goal[i]-pos[i])/dist_to_goal
+                attr = 2*np.array(goal[i]-pos[i])/dist_to_goal
                 a[i] = np.array(attr)
                 #print("a",i,a[i])
 
                 #repulsive potential
                 colliding=False
                 for j in range(n):
+                    dist = np.linalg.norm(pos[j]-pos[i])
+                    if dist < min_dist[i][j]:
+                        min_dist[i][j] = dist
                     if j != i:
                         if collision(i, j):
                             colliding=True
                             print("collision",i,j)
-                            dist = np.linalg.norm(pos[j]-pos[i])
-                            rep = (priority[j]/priority[i])*4*(e**(-0.2*dist**2))*(pos[i]-pos[j])/dist
+                            #dist = np.linalg.norm(pos[j]-pos[i])
+                            rep = (priority[j]/priority[i])*20*(e**(-0.2*dist**2))*(pos[i]-pos[j])/dist
                             rep = rotate_vector(rep, np.pi/2)
                             #print(i,j,dist,rep,a[i])
                             a[i] += rep
@@ -323,6 +341,14 @@ if __name__ == "__main__":
 
 
     acc_file.close()
+
+    for i in range(n):
+        avg_dist[i] = np.mean(min_dist[i])
+    
+    avg_file = open('avg.csv','w')
+    avg_file.write(",".join([str(x) for x in avg_dist])+"\n")
+
+    print("n:",n)
 
 
 

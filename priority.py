@@ -123,11 +123,17 @@ def generator(n):
 
 u, v, pos, goal, priority, a, completed, clip, vmax = generator(n)
 
+<<<<<<< HEAD
 priority = np.random.normal(3,1, n)
 completion = [0]*n
 priority_file = open("priority.csv",'w')
 priority_file.write(", ".join([str(x) for x in priority]))
 priority_file.close()
+=======
+priority = np.array([1,2,3,2,1])
+completion = [0]*n
+
+>>>>>>> main
 """
 Now we calculate the forces to be applied
 
@@ -144,9 +150,14 @@ two definitions for reached goal(completed trip), one checks wether distance to 
 
 """
 def reached_goal(i):
+<<<<<<< HEAD
     global pos, goal, r
     if np.linalg.norm(pos[i]-goal[i]) <= 5:
         print(f"UAV {i} reached goal. Priority:{priority[i]}")
+=======
+    global pos, goal
+    if np.linalg.norm(pos[i]-goal[i]) <= 1:
+>>>>>>> main
         return True
     else:
         return False
@@ -180,10 +191,98 @@ def clip_v(n):
         #vmax[i]=maxv
         if np.linalg.norm(v[i])>vmax[i]:
             v[i] = vmax[i]*v[i]/np.linalg.norm(v[i])
+<<<<<<< HEAD
 
         
         #print(i,v[i], np.linalg.norm(v[i]), vmax[i])
 
+=======
+        print(i,v[i], np.linalg.norm(v[i]), vmax[i])
+
+
+"""
+Function to pertube angle of vector by a slight amount randomly. draw from N(0, pi/64)
+let's pertube the whole v matrix
+"""
+
+
+def pertube(v):
+    
+    for i, vel in enumerate(v):
+        x = vel[0]
+        y = vel[1]
+
+        delta_theta = np.random.normal(0,np.pi/2**10.5)
+        theta = np.arctan2(y, x)
+
+        # Perturb the angle by a small amount
+        theta_perturbed = theta + delta_theta
+
+        # Calculate the perturbed vector components using the perturbed angle
+        x_perturbed = np.cos(theta_perturbed) * np.sqrt(x**2 + y**2)
+        y_perturbed = np.sin(theta_perturbed) * np.sqrt(x**2 + y**2)
+
+        v[i] = np.array([x_perturbed, y_perturbed])
+
+"""
+test:
+v - pertube(v) != 0
+"""
+
+"""
+rotate vector v=x,y by angle theta
+"""
+
+def rotate_vector(v, theta):
+    x, y = v[0], v[1]
+    # convert theta to radians
+    #theta = math.radians(theta)
+    
+    # calculate sine and cosine of theta
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+    
+    # apply rotation formula
+    x_new = x * cos_theta - y * sin_theta
+    y_new = x * sin_theta + y * cos_theta
+    
+    return np.array([x_new, y_new])
+
+r=0
+if __name__ == "__main__":
+
+    file = open('out.csv','w')
+    velocity_file = open('vel.csv', 'w')
+    time_file = open('time.csv', 'w')
+    acc_file = open('acc.csv', 'w')
+    header = ""
+    for m in range(n):
+        header += str(m)+"x,"+str(m)+"y,"
+    file.write(header+"\n")
+    velocity_file.write(header+"\n")
+    acc_file.write(header+"\n")
+    header2 = ", ".join([f"{i+1}" for i in range(n)])+"\n"
+    time_file.write(header2)
+
+while (completed != check).all():
+    """
+    for each UAV:
+        if reached goal:
+            completed[self] = 1
+
+        attractive    
+        calculate goal a
+        add to a
+
+        repulsive
+        for each other UAV:
+            if collision:
+                clip[self] = True
+                calculate repulsive a
+                add to a
+            else:
+                pass
+>>>>>>> main
 
 """
 Function to pertube angle of vector by a slight amount randomly. draw from N(0, pi/64)

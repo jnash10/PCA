@@ -2,11 +2,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy import e 
 import math
-from hyperparameters import noise, n, radius, delt, priority, pert
+import time
+import pandas as pd
+import os
 #global position matrix
 #global current velocity matrix
+data_Array = np.zeros((7,13))
 
-
+def reset():
+    os.remove('time.csv')
+    os.remove('priority.csv')
+    os.remove('avg.csv')
+if os.path.isfile('time.csv'):  
+    reset()
+#seed = 34
+start=time.time()
+i=0
+from hyperparameters import noise, radius, delt, pert, b, sensor_range, n, maxv, attractive_gain, repulsive_gain, collision_distance, clipping_power, seed
+np.random.seed(seed)
+print("random seed:",seed)
 """
 to calculate velocity:
 
@@ -48,11 +62,11 @@ pos = pos + u*delt
 
 #delt = 0.01
 #radius = 100
-maxv = 2
 
-
+#n=16
 
 """
+
 function for initial positions and goals of n UAVs.
 Equally space around a circle initially.
 Goal = diammetrically opposite point + normal(0,pi/3)
@@ -70,7 +84,51 @@ example:
             [ 3.43231798 -9.3925073 ]
             [-6.81016609  7.32267969]]
 """
+from hyperparameters import spread, noise
 def initialise_pos(n):
+    start = []
+    goal = []
+    start_color = []
+    goal_color = []
+
+
+    for i in range(1,n//4+1):
+        one = (np.cos((spread )*(i/(n//4))), np.sin((spread )*(i/(n//4))))
+        two = (-np.cos((spread )*(i/(n//4))), np.sin((spread )*(i/(n//4))))
+        three = (-np.cos((spread )*(i/(n//4))), -np.sin((spread )*(i/(n//4))))
+        four = (np.cos((spread )*(i/(n//4))), -np.sin((spread )*(i/(n//4))))
+        
+        start += [one, two, three, four]
+        goal += [two, one, four, three]
+
+    cmap = plt.get_cmap('hsv')
+    colors = [cmap(i) for i in np.linspace(0, 1, n+2)]
+    colors = colors[2:]
+    
+    
+    fig, ax = plt.subplots(figsize=(20,10))
+    plt.scatter(radius*np.array(start)[:,0], radius*np.array(start)[:,1], c=colors, s=200)
+    plt.scatter(1.2*radius*np.array(goal)[:,0], 1.2*radius*np.array(goal)[:,1], c=colors, marker="s", s=200, alpha=0.5)
+
+    plt.xlim(-1.2*radius, 1.2*radius)
+    plt.ylim(-radius/2,radius/2)
+    #plt.ylim(-20,20)
+
+    plt.gca().add_patch(plt.Circle((0,0), radius, fill=False))
+    plt.gca().add_patch(plt.Circle((0,0), 1.2*radius, fill=False))
+    plt.xlabel('x', fontsize=24)
+    plt.ylabel('y', fontsize=24)
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+
+    plt.savefig('/media/storage/Agam/pca/plots/comparison plots/start.eps',format='eps')
+        
+
+    
+    start, goal = radius*np.array(start), 1.2*radius*np.array(goal)
+
+    return start, goal
+
     start = []
     goal = []
 
@@ -89,6 +147,25 @@ def initialise_pos(n):
         goal.append((x_, y_))
     
     start, goal = radius*np.array(start), radius*np.array(goal)
+
+    cmap = plt.get_cmap('hsv')
+    colors = [cmap(i) for i in np.linspace(0, 1, n)]
+    #colors = colors[2:]
+    
+    
+    fig, ax = plt.subplots(figsize=(20,10))
+    plt.scatter(radius*np.array(start)[:,0], radius*np.array(start)[:,1], c=colors, s=200)
+    plt.scatter(radius*np.array(goal)[:,0], radius*np.array(goal)[:,1], c=colors, marker="s", s=200, alpha=0.5)
+
+    plt.xlim(radius, radius)
+    plt.ylim(-radius,radius)
+
+    plt.gca().add_patch(plt.Circle((0,0), radius, fill=False))
+    plt.gca().add_patch(plt.Circle((0,0), 1.2*radius, fill=False))
+    plt.xlabel('x', fontsize=18)
+    plt.ylabel('y', fontsize=18)
+
+    plt.savefig('/media/storage/Agam/pca/plots/experiments/5_uavs.eps',format='eps')
 
     return start, goal
 
@@ -123,17 +200,25 @@ def generator(n):
 
 u, v, pos, goal, a, completed, clip, vmax = generator(n)
 
-if priority=="Gaussian":
+from hyperparameters import priority_type
+if priority_type=="Gaussian":
     priority = np.random.normal(3,1, n)
-elif priority == "Uniform":
-    priority = np.random.uniform(1,5, n)
+elif priority_type == "Uniform":
+    priority = np.random.uniform(1,6, n)
 else:
     priority = 3*np.ones(n)
 
+#priority=[1,3,1,1]
+in_collision = [[i] for i in priority]
+
+#in_collision = [[i] for i in priority]
+
 completion = [0]*n
-priority_file = open("priority.csv",'w')
-priority_file.write(", ".join([str(x) for x in priority]))
+priority_file = open("priority.csv",'a')
+priority_file.write(", ".join([str(x) for x in priority])+'\n')
 priority_file.close()
+
+# exec_file = open('exec.csv', 'a')
 """
 Now we calculate the forces to be applied
 
@@ -151,8 +236,8 @@ two definitions for reached goal(completed trip), one checks wether distance to 
 """
 def reached_goal(i):
     global pos, goal, r
-    if np.linalg.norm(pos[i]-goal[i]) <= 5:
-        print(f"UAV {i} reached goal. Priority:{priority[i]}")
+    if np.linalg.norm(pos[i]-goal[i]) <= radius/100:
+        #print(f"UAV {i} reached goal. Priority:{priority[i]}")
         return True
     else:
         return False
@@ -161,14 +246,17 @@ def reached_goal(i):
     
 
 def collision(i,j):#return true if collision eminenent between j and i. collision threshold = 0.1
+    
     t = -np.dot(pos[i]-pos[j],v[i]-v[j])/(np.dot(v[i]-v[j], v[i]-v[j])+0.00001)
 
     if t<0:
         return False
     else:
         s_quared = np.dot(pos[i] + v[i]*t - pos[j] - v[j]*t, pos[i] + v[i]*t - pos[j] - v[j]*t) 
+        dist = np.linalg.norm(pos[i]-pos[j])
 
-        if np.sqrt(s_quared)<0.5:
+        if np.sqrt(s_quared)<collision_distance and dist < sensor_range:
+            in_collision[i].append(priority[j])
             return True
         else:
             return False
@@ -180,7 +268,7 @@ def clip_v(n):
     for i in range(n):
         
         if clip[i]:
-            vmax[i] = maxv*priority[i]/max(priority)
+            vmax[i] = maxv*(priority[i]/max(in_collision[i]))**clipping_power
         else:
             vmax[i] = maxv
         #vmax[i]=maxv
@@ -240,11 +328,13 @@ def rotate_vector(v, theta):
     return np.array([x_new, y_new])
 
 r=0
+
+
 if __name__ == "__main__":
 
     file = open('out.csv','w')
     velocity_file = open('vel.csv', 'w')
-    time_file = open('time.csv', 'w')
+    time_file = open('time.csv', 'a')
     acc_file = open('acc.csv', 'w')
     header = ""
     for m in range(n):
@@ -256,6 +346,7 @@ if __name__ == "__main__":
     #time_file.write(", ".join([str(x) for x in priority]))
 
     while not np.array_equal(completed, check):
+        # i+=1
         r+=1
         """
         for each UAV:
@@ -302,10 +393,10 @@ if __name__ == "__main__":
                     completion[i]=r
                 
             else:
-                #attractive potential 
+                #attractive force 
                 dist_to_goal = np.linalg.norm(goal-pos)
                 #attr = 2*(1-e**(-2*dist_to_goal**2))*np.array(goal[i]-pos[i])/dist_to_goal
-                attr = 2*np.array(goal[i]-pos[i])/dist_to_goal
+                attr = attractive_gain*np.array(goal[i]-pos[i])/dist_to_goal
                 a[i] = np.array(attr)
                 #print("a",i,a[i])
 
@@ -320,7 +411,7 @@ if __name__ == "__main__":
                             colliding=True
                             #print("collision",i,j)
                             #dist = np.linalg.norm(pos[j]-pos[i])
-                            rep = (priority[j]/priority[i])*10*(e**(-0.1*dist**2))*(pos[i]-pos[j])/dist
+                            rep = (priority[j]/priority[i])*repulsive_gain*(e**(-b*(dist-collision_distance)**2))*(pos[i]-pos[j])/dist
                             rep = rotate_vector(rep, np.pi/2)
                             #print(i,j,dist,rep,a[i])
                             a[i] += rep
@@ -339,7 +430,7 @@ if __name__ == "__main__":
         acc_file.write(", ".join([str(x) for x in a.flatten()])+"\n")
     print(completed)
     print(check)
-    time_file.write(", ".join([str(x) for x in completion]))
+    time_file.write(", ".join([str(x) for x in completion])+'\n')
     time_file.close()
 
     file.close()
@@ -351,16 +442,21 @@ if __name__ == "__main__":
     for i in range(n):
         avg_dist[i] = np.mean(min_dist[i])
     
-    avg_file = open('avg.csv','w')
+    avg_file = open('avg.csv','a')
     avg_file.write(",".join([str(x) for x in avg_dist])+"\n")
+    # end = time.time()
+    # excec_time = end-start
+    # exec_file.write(f'{i},{excec_time}')
+    print("n:",n, "priority: ",priority)
+    avg_file.close()
 
-    print("n:",n)
 
 
 
+
+                
             
         
-    
 
 
 

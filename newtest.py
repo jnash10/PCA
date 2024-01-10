@@ -54,46 +54,43 @@ maxv = 2
 
 """
 function for initial positions and goals of n UAVs.
-Equally space around a circle initially.
-Goal = diammetrically opposite point + normal(0,pi/3)
 
-example:
-    n = 3
-    start: [(0,0), (cos(2pi/3),sin(2pi/3)), (cos(4pi/3), sin(4pi/3))]
-    goal: [(0,0), (-cos(2pi/3 + noise),-sin(2pi/3 + noise)), (-cos(4pi/3 + noise), -sin(4pi/3 + noise))]
+within +-pi/6
 
-    start:  [[10.          0.        ]
-            [-5.          8.66025404]
-            [-5.         -8.66025404]]
-    
-    goal    [[-9.73431938 -2.28976552]
-            [ 3.43231798 -9.3925073 ]
-            [-6.81016609  7.32267969]]
+create 4 sets:
+cos, sin --> -cos, sin
+-cos, sin --> cos, sin
+-cos, - sin --> cos, -sin
+cos, -sin --> -cos, -sin
+
+angles = (pi/6)(i/n) where n is number of uavs in a quadrant
 """
 def initialise_pos(n):
     start = []
     goal = []
 
-    np.random.seed(3)
-    for i in range(n):
-        x = np.cos(2*i*np.pi/n)
-        y = np.sin(2*i*np.pi/n)
+    for i in range(1,n//4+1):
+        one = (np.cos((np.pi/3)*(i/n)), np.sin((np.pi/3)*(i/n)))
+        two = (-np.cos((np.pi/3)*(i/n)), np.sin((np.pi/3)*(i/n)))
+        three = (-np.cos((np.pi/3)*(i/n)), -np.sin((np.pi/3)*(i/n)))
+        four = (np.cos((np.pi/3)*(i/n)), -np.sin((np.pi/3)*(i/n)))
+        
+        start += [one, two, three, four]
+        goal += [two, one, four, three]
 
-        start.append((x, y))
-
-        #noise = 0
-        #noise = np.random.normal(0, np.pi/12)
-        x_ = -np.cos(2*i*np.pi/n + noise)
-        y_ = -np.sin(2*i*np.pi/n + noise)
-
-        goal.append((x_, y_))
     
     start, goal = radius*np.array(start), radius*np.array(goal)
 
     return start, goal
 
 
+start , goal = initialise_pos(n)
 
+plt.scatter(start[:,0],start[:,1])
+plt.scatter(goal[:,0], goal[:,1])
+plt.xlim(-radius,radius)
+plt.ylim(-radius, radius)
+plt.show()
 
 
 
@@ -151,7 +148,7 @@ two definitions for reached goal(completed trip), one checks wether distance to 
 """
 def reached_goal(i):
     global pos, goal, r
-    if np.linalg.norm(pos[i]-goal[i]) <= 5:
+    if np.linalg.norm(pos[i]-goal[i]) <= radius/5:
         print(f"UAV {i} reached goal. Priority:{priority[i]}")
         return True
     else:

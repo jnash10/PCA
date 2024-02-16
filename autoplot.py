@@ -350,7 +350,7 @@ for ix, n in enumerate([4,8,12,16,20,24]):
                             
                         else:
                             #attractive force 
-                            dist_to_goal = np.linalg.norm(goal-pos)
+                            dist_to_goal = np.linalg.norm(goal[i]-pos[i])
                             #attr = 2*(1-e**(-2*dist_to_goal**2))*np.array(goal[i]-pos[i])/dist_to_goal
                             attr = 2*np.array(goal[i]-pos[i])/dist_to_goal
                             a[i] = np.array(attr)

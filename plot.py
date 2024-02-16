@@ -329,6 +329,8 @@ def rotate_vector(v, theta):
 
 r=0
 
+def run_exp(number_of_uavs, iteration_number):
+
 
 if __name__ == "__main__":
 
@@ -348,40 +350,6 @@ if __name__ == "__main__":
     while not np.array_equal(completed, check):
         # i+=1
         r+=1
-        """
-        for each UAV:
-            if reached goal:
-                completed[self] = 1
-
-            attractive    
-            calculate goal a
-            add to a
-
-            repulsive
-            for each other UAV:
-                calc dist -> update min dist
-                if collision:
-                    clip[self] = True
-                    calculate repulsive a
-                    add to a
-                else:
-                    pass
-
-        
-        v = v + a*delt
-        clip v
-        to clip v, 
-        for each uav:
-            if clip[i] == True
-                vmax[i] = maxv*my_p/(max_p - lowest_p + 1)
-            else:
-                vmax[i] = maxv
-            if v>vmax:
-                v = maxvv[i]-v[j]
-        
-
-        completition check: within 0.1 of goal
-        """
         clip = np.zeros(n)
         a = np.zeros((n,2))
         for i in range(n):
@@ -394,7 +362,7 @@ if __name__ == "__main__":
                 
             else:
                 #attractive force 
-                dist_to_goal = np.linalg.norm(goal-pos)
+                dist_to_goal = np.linalg.norm(goal[i]-pos[i])
                 #attr = 2*(1-e**(-2*dist_to_goal**2))*np.array(goal[i]-pos[i])/dist_to_goal
                 attr = attractive_gain*np.array(goal[i]-pos[i])/dist_to_goal
                 a[i] = np.array(attr)
